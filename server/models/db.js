@@ -14,7 +14,7 @@ const connection = mysql.createPool({
 connection.getConnection()
   .then(connect => {
     console.log('Connected to MySQL Server:', connect.threadId);
-    // Export the connection object for use throughout the application
+
   })
   .catch(err => {
     console.error('Error connecting to MySQL:', err);

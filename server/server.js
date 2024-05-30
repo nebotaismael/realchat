@@ -8,6 +8,13 @@ const bcrypt = require('bcrypt');
 // Configure database connection (replace with your actual implementation)
 const connection = require('./models/db');
 const jwt = require('jsonwebtoken');
+const { getUserController, deleteUserController, updateUserController, getAllUsersController } = require('./user/usercontroller');
+const { authentication, register, login, generateAccessToken } = require('./auth/authcontroller');
+const { postMessageController, getMessagesController, updateMessageStatusController, deleteMessageController } = require('./message/MessageController');
+const { addContactController, getContactsController, deleteContactController } = require('./contacts/contactController');
+const { createChatSessionController, getChatSessionController } = require('./chatsessions/chatSessionController');
+const { addParticipantController, getParticipantsController, removeParticipantController } = require('./chatparticipants/chatParticipantController');
+const { createReceiptController, getReceiptsController, updateReceiptStatusController } = require('./MessageReceipt/messageReceiptController');
 
 // Middleware
 app.use(express.json());
@@ -20,212 +27,37 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Function to generate JWT (replace with your specific logic)
-function generateAccessToken(user) {
-  return jwt.sign({ phone_number: user.phone_number }, process.env.JWT_SECRET);
-}
+app.get('/user', authentication, getUserController);
 
-// Authentication middleware
-const authentication = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-
-  if (!authHeader) {
-    return res.status(401).send('Unauthorized: Missing authorization header');
-  }
-
-  const token = authHeader.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).send('Unauthorized: Missing token');
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      if (err.name === 'JsonWebTokenError') {
-        return res.status(403).send('Forbidden: Invalid or expired token');
-      } else {
-        console.error('Error verifying token:', err.message);
-        return res.status(500).send('Internal server error');
-      }
-    }
-
-    req.user = user;
-    next();
-  });
-};
-
-// User registration
-app.post('/register', async (req, res) => {
-  const { phone_number, name, status, password, profile_picture } = req.body;
-
-  try {
-    // Validate user input
-    if (!phone_number || !name || !password || !profile_picture) {
-      return res.status(400).send('Missing required fields');
-    }
-
-    // Hash password securely
-    const hashedPassword = await bcrypt.hash(password, 10); // Adjust salt rounds as needed
-
-    // Construct prepared SQL query
-    const query = `INSERT INTO users (phone_number, name, status, password, profile_picture) VALUES (?, ?, ?, ?, ?)`;
-
-    // Execute prepared statement
-    connection.query(query, [phone_number, name, status, hashedPassword, profile_picture], (error, results) => {
-      if (error) {
-        console.error(error);
-        if (error.code === 'ER_DUP_ENTRY') {
-          return res.status(409).send('Phone number or name already exists');
-        }
-        return res.status(500).send('Error registering user');
-      }
-
-      res.status(201).send('User registered successfully');
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Internal server error');
-  }
-});
-
-// User login
-app.post('/login', async (req, res) => {
-  const { phone_number, password } = req.body;
-
-  try {
-    // Validate required fields
-    if (!phone_number || !password) {
-      return res.status(400).send('Missing required fields');
-    }
-
-    // Securely retrieve user by phone number using prepared statement
-    const query = `SELECT * FROM users WHERE phone_number = ?`;
-    const [rows] = await connection.query(query, [phone_number]);
-console.log(rows);
-    if (rows.length === 0) {
-      return res.status(401).send('Invalid credentials'); // More specific error message
-    }
-
-    // Hash the incoming password for comparison (optional if password is already stored hashed)
- 
-
-    // Verify password using bcrypt.compare (if not already hashed)
-    if (!bcrypt.compareSync(password, rows[0].password)) {
-        return res.status(401).send('Invalid credentials');
-      }
-  
-      // Generate and send access token
-      const accessToken = generateAccessToken(rows[0]);
-      res.json({ accessToken });
-    } catch (error) {
-      console.error(error);
-      res.status(500).send('Internal server error');
-    }
-  });
-  
-  // Protected route example
-  app.get('/protected', authentication, (req, res) => {
-    try {
-      // Access user information from req.user (if authentication is successful)
-      res.json({ message: 'Welcome, authorized user!' });
-    } catch (error) {
-      console.error(error);
-      res.status(500).send('Internal server error');
-    }
-  });
-
+app.get('/users', authentication, getAllUsersController);
 // User update
-app.put('/update', authentication, async (req, res) => {
-  const { phone_number, name, status, password, profile_picture } = req.body;
-
-  try {
-    // Validate user input
-    if (!phone_number || !name || !password || !profile_picture) {
-      return res.status(400).send('Missing required fields');
-    }
-
-    // Hash password securely
-    const hashedPassword = await bcrypt.hash(password, 10); // Adjust salt rounds as needed
-
-    // Construct prepared SQL query
-    const query = `UPDATE users SET name = ?, status = ?, password = ?, profile_picture = ? WHERE phone_number = ?`;
-
-    // Execute prepared statement
-    connection.query(query, [name, status, hashedPassword, profile_picture, phone_number], (error, results) => {
-      if (error) {
-        console.error(error);
-        return res.status(500).send('Error updating user');
-      }
-
-      res.status(200).send('User updated successfully');
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Internal server error');
-  }
-});
+app.put('/update', authentication, updateUserController);
 
 // User delete
-app.delete('/delete', authentication, async (req, res) => {
-  const { phone_number } = req.body;
+app.delete('/delete', authentication, deleteUserController  );
+app.post('/message',authentication, postMessageController);
+app.get('/messages',authentication, getMessagesController);
+app.put('/message/status',authentication, updateMessageStatusController);
+app.delete('/message',authentication, deleteMessageController);
 
-  try {
-    // Validate user input
-    if (!phone_number) {
-      return res.status(400).send('Missing required fields');
-    }
+app.post('/contact', authentication, addContactController);
+app.get('/contacts',authentication, getContactsController);
+app.delete('/contact',authentication, deleteContactController);
+app.post('/chat-session',authentication, createChatSessionController);
+app.get('/chat-session', authentication, getChatSessionController);
 
-    // Construct prepared SQL query
-    const query = `DELETE FROM users WHERE phone_number = ?`;
+app.post('/register', register);
+app.post('/login', login);
 
-    // Execute prepared statement
-    connection.query(query, [phone_number], (error, results) => {
-      if (error) {
-        console.error(error);
-        return res.status(500).send('Error deleting user');
-      }
+app.post('/chat-participant',authentication, addParticipantController);
+app.get('/chat-participants',authentication, getParticipantsController);
+app.delete('/chat-participant',authentication, removeParticipantController);
 
-      res.status(200).send('User deleted successfully');
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Internal server error');
-  }
-});
+app.post('/message-receipt', authentication, createReceiptController);
+app.get('/message-receipts',authentication, getReceiptsController);
+app.put('/message-receipt/status',authentication, updateReceiptStatusController);
 
-// Get user info
-app.get('/user', authentication, async (req, res) => {
-  const { phone_number } = req.user;
 
-  try {
-    // Validate user input
-    if (!phone_number) {
-      return res.status(400).send('Missing required fields');
-    }
-
-    // Construct prepared SQL query
-    const query = `SELECT * FROM users WHERE phone_number = ?`;
-
-    // Execute prepared statement
-    connection.query(query, [phone_number], (error, results) => {
-      if (error) {
-        console.error(error);
-        return res.status(500).send('Error getting user info');
-      }
-
-      // Remove password from the results before sending
-      if (results[0]) {
-        delete results[0].password;
-      }
-
-      res.status(200).json(results[0]);
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Internal server error');
-  }
-});
-  
   // Error handling middleware (optional)
   app.use((err, req, res, next) => {
     console.error(err.stack); // Log the error for debugging
@@ -233,16 +65,51 @@ app.get('/user', authentication, async (req, res) => {
   });
   
   // Socket.IO integration (optional, replace with your specific implementation)
-  const io = new Server(http);
-  io.on('connection', (socket) => {
-    console.log('A user connected');
-  
-    // Handle socket events and logic here
-    socket.on('disconnect', () => {
-      console.log('A user disconnected');
-    });
+// Socket.IO integration
+const io = new Server(http);
+io.on('connection', (socket) => {
+  console.log('A user connected');
+
+  // Handle user authentication and join the user to a room for each chat session
+  socket.on('authenticate', async (token) => {
+    try {
+      const user = jwt.verify(token, process.env.JWT_SECRET);
+      const chatSessions = await getChatSessionController(user.id);
+      chatSessions.forEach(session => {
+        socket.join(`chat_${session.id}`);
+      });
+    } catch (err) {
+      console.error(err);
+    }
   });
-  
+
+  // Handle sending a new message
+  socket.on('send_message', async (data) => {
+    const { chat_session_id, sender_id, message_type, content, attachment_url } = data;
+    const messageId = await postMessageController(chat_session_id, sender_id, message_type, content, attachment_url);
+    io.to(`chat_${chat_session_id}`).emit('new_message', { messageId, chat_session_id, sender_id, message_type, content, attachment_url });
+  });
+
+  // Handle updating message status
+  socket.on('update_message_status', async (data) => {
+    const { message_id, recipient_id, status } = data;
+    await updateMessageStatusController(message_id, recipient_id, status);
+    io.to(`chat_${chat_session_id}`).emit('message_status_updated', { message_id, recipient_id, status });
+  });
+
+  // Handle adding a new chat participant
+  socket.on('add_participant', async (data) => {
+    const { chat_session_id, user_id } = data;
+    await addParticipantController(chat_session_id, user_id);
+    socket.join(`chat_${chat_session_id}`);
+    io.to(`chat_${chat_session_id}`).emit('new_participant', { chat_session_id, user_id });
+  });
+
+  // Handle user disconnect
+  socket.on('disconnect', () => {
+    console.log('A user disconnected');
+  });
+});
   const serverPort = process.env.PORT || 4000;
   http.listen(serverPort, () => console.log(`Server listening on port ${serverPort}`));
   
