@@ -80,7 +80,7 @@ io.on('connection', (socket) => {
       });
     } catch (err) {
       console.error(err);
-    }
+    } 
   });
 
   // Handle sending a new message
