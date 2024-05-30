@@ -79,7 +79,7 @@ io.on('connection', (socket) => {
         socket.join(`chat_${session.id}`);
       });
     } catch (err) {
-      console.error(err);
+      console.error(err); 
     } 
   });
 
