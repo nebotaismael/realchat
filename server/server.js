@@ -134,7 +134,97 @@ console.log(rows);
     }
   });
 
-  app.use
+// User update
+app.put('/update', authentication, async (req, res) => {
+  const { phone_number, name, status, password, profile_picture } = req.body;
+
+  try {
+    // Validate user input
+    if (!phone_number || !name || !password || !profile_picture) {
+      return res.status(400).send('Missing required fields');
+    }
+
+    // Hash password securely
+    const hashedPassword = await bcrypt.hash(password, 10); // Adjust salt rounds as needed
+
+    // Construct prepared SQL query
+    const query = `UPDATE users SET name = ?, status = ?, password = ?, profile_picture = ? WHERE phone_number = ?`;
+
+    // Execute prepared statement
+    connection.query(query, [name, status, hashedPassword, profile_picture, phone_number], (error, results) => {
+      if (error) {
+        console.error(error);
+        return res.status(500).send('Error updating user');
+      }
+
+      res.status(200).send('User updated successfully');
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// User delete
+app.delete('/delete', authentication, async (req, res) => {
+  const { phone_number } = req.body;
+
+  try {
+    // Validate user input
+    if (!phone_number) {
+      return res.status(400).send('Missing required fields');
+    }
+
+    // Construct prepared SQL query
+    const query = `DELETE FROM users WHERE phone_number = ?`;
+
+    // Execute prepared statement
+    connection.query(query, [phone_number], (error, results) => {
+      if (error) {
+        console.error(error);
+        return res.status(500).send('Error deleting user');
+      }
+
+      res.status(200).send('User deleted successfully');
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Get user info
+app.get('/user', authentication, async (req, res) => {
+  const { phone_number } = req.user;
+
+  try {
+    // Validate user input
+    if (!phone_number) {
+      return res.status(400).send('Missing required fields');
+    }
+
+    // Construct prepared SQL query
+    const query = `SELECT * FROM users WHERE phone_number = ?`;
+
+    // Execute prepared statement
+    connection.query(query, [phone_number], (error, results) => {
+      if (error) {
+        console.error(error);
+        return res.status(500).send('Error getting user info');
+      }
+
+      // Remove password from the results before sending
+      if (results[0]) {
+        delete results[0].password;
+      }
+
+      res.status(200).json(results[0]);
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Internal server error');
+  }
+});
   
   // Error handling middleware (optional)
   app.use((err, req, res, next) => {
